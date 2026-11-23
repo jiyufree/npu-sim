@@ -1,43 +1,68 @@
+"""Mini NPU Simulator - 실행 진입점.
+
+사용법:
+    python main.py                 # 모드 선택 메뉴
+    python main.py 다른파일.json   # 모드 2에서 읽을 JSON 경로 지정 (기본: main.py 옆 data.json)
+"""
+
+import os
+import sys
+
+from src.console import ask, fmt_score, section
+from src.generator import make_cross, make_x
+from src.judge import judge
 from src.mac import mac
-from src.mode_input import read_matrix
+from src.mode_input import run_mode_1
 from src.mode_json import run_mode_2
-from src.perf import measure_mac_ms
+from src.perf import REPEAT, measure_sizes, print_flat_compare, print_perf_table
 
-def run_mode_1():
-    filter_a = read_matrix("필터 A")
-    print("필터 A 저장 완료:", filter_a)
-    
-    filter_b = read_matrix("필터 B")
-    print("필터 B 저장 완료:", filter_b)
-    
-    pattern = read_matrix("패턴")
-    
-    score_a = mac(pattern, filter_a)
-    score_b = mac(pattern, filter_b)
-    
-    print("\n[결과]")
-    print(f"필터 A 점수: {score_a}")
-    print(f"필터 B 점수: {score_b}")
-    
-    if score_a > score_b:
-        print("판정: A")
-    elif score_b > score_a:
-        print("판정: B")
-    else:
-        print("판정: 동점")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DATA = os.path.join(BASE_DIR, "data.json")
 
-# 프로그램 실행
-if __name__ == "__main__":
-    print("===== Mini NPU Simulator =====")
+
+def run_mode_3():
+    """(보너스) 패턴 생성기: N을 입력받아 N×N Cross/X를 만들고 판정·성능 분석에 재사용한다."""
+    while True:
+        text = ask("생성할 크기 N (3 이상 정수): ").strip()
+        if text.isdigit() and int(text) >= 3:
+            n = int(text)
+            break
+        print("입력 형식 오류: 3 이상의 정수를 입력하세요.")
+
+    cross_f, x_f = make_cross(n), make_x(n)
+    section(f"[1] 생성된 {n}×{n} 패턴으로 판정")
+    for name, pattern in (("Cross 패턴", cross_f), ("X 패턴", x_f)):
+        sc, sx = mac(pattern, cross_f), mac(pattern, x_f)
+        print(f"{name}: Cross 점수 {fmt_score(sc)} / X 점수 {fmt_score(sx)} → 판정 {judge(sc, sx)}")
+
+    section(f"[2] 성능 분석 (평균/{REPEAT}회)")
+    rows = measure_sizes([n], {n: {"Cross": cross_f}})
+    print_perf_table(rows)
+    print()
+    print_flat_compare(rows)
+
+
+def main():
+    data_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_DATA
+
+    print("=== Mini NPU Simulator ===")
+    print("\n[모드 선택]")
     print("1. 사용자 입력 (3x3)")
     print("2. data.json 분석")
-    choice = input("모드를 선택하세요 (1/2): ")
+    print("3. 패턴 생성기 (보너스)")
+    while True:
+        choice = ask("선택: ").strip()
+        if choice in ("1", "2", "3"):
+            break
+        print("1, 2, 3 중 하나를 입력하세요.")
 
-    if choice == '1':
+    if choice == "1":
         run_mode_1()
-        measure_mac_ms() # 모드 1 끝나고 성능 분석 출력!
-    elif choice == '2':
-        run_mode_2()
-        measure_mac_ms() # 모드 2 끝나고 성능 분석 출력!
+    elif choice == "2":
+        run_mode_2(data_path)
     else:
-        print("잘못된 입력입니다.")
+        run_mode_3()
+
+
+if __name__ == "__main__":
+    main()

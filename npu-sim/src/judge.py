@@ -1,21 +1,36 @@
-EPSILON = 1e-9 # 아주아주 작은 허용 오차 기준
+"""라벨 정규화와 epsilon 기반 점수 비교(판정) 정책."""
+
+EPSILON = 1e-9  # |A - B| < EPSILON 이면 동점으로 본다
+
+CROSS = "Cross"
+X = "X"
+UNDECIDED = "UNDECIDED"
+
+# 외부 데이터에 쓰이는 다양한 표기 → 프로그램 내부 표준 라벨
+_LABEL_MAP = {
+    "+": CROSS,
+    "cross": CROSS,
+    "plus": CROSS,
+    "x": X,
+    "ex": X,
+    "×": X,
+}
+
 
 def normalize_label(raw):
-    # 양옆 공백을 없애고 소문자로 바꿔서 비교해요
+    """'+', 'cross', 'x' 등 표기를 표준 라벨(Cross / X)로 바꾼다. 모르는 값이면 None."""
+    if raw is None:
+        return None
     key = str(raw).strip().lower()
-    
-    # +, cross, plus 라고 적혀있으면 모두 'Cross'로 통일!
-    if key in ("+", "cross", "plus"):
-        return "Cross"
-    # x, ex 라고 적혀있으면 모두 'X'로 통일!
-    if key in ("x", "ex"):
-        return "X"
-        
-    return None # 모르는 글자면 빈값을 줘요
+    return _LABEL_MAP.get(key)
 
-def judge(a, b, la="Cross", lb="X"):
-    # 두 점수의 차이가 EPSILON(1e-9)보다 작으면 완전히 같은 점수(동점)로 봐줘요!
-    if abs(a - b) < EPSILON:
-        return "UNDECIDED"
-    # 아니면 점수가 더 큰 쪽의 이름을 돌려줘요
-    return la if a > b else lb
+
+def is_tie(score_a, score_b, eps=EPSILON):
+    return abs(score_a - score_b) < eps
+
+
+def judge(score_a, score_b, label_a=CROSS, label_b=X, eps=EPSILON):
+    """두 점수를 비교해 더 큰 쪽의 라벨을, 차이가 eps 미만이면 UNDECIDED를 반환한다."""
+    if is_tie(score_a, score_b, eps):
+        return UNDECIDED
+    return label_a if score_a > score_b else label_b
